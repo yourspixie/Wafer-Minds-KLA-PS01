@@ -149,12 +149,4 @@ Full pinned dependency list (from `pip freeze` in the training environment) is i
 
 ---
 
-## References
 
-- _Add papers, datasets, and tools referenced (e.g. RCAN, ESRGAN, SSIM loss formulation, etc.)_
-
----
-
-## License
-
-_MIT (or update as appropriate for the hackathon's submission terms)_
