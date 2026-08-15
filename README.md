@@ -128,7 +128,7 @@ Training expects paired degraded/ground-truth `.npy` files under `--data_dir` (s
 
 - File: `weights/model.pt`
 - Format: PyTorch `state_dict` (`.pt`), loadable directly by `eval.py`
-- Size: _TBD — add actual size_
+- Size: 33.1MB
 ---
 
 ## Technology & Feasibility
