@@ -5,8 +5,8 @@
 ## Team
 
 | Name |  Contact |
-|---|---|---|
-| REYNA |   _email_ |
+
+| REYNA |   kreynareddy@gmail.com |
 | SACI | sacimense@gmail.com |
 
 College: PESU(RR)
