@@ -1,150 +1,141 @@
-# Wafer-Minds — Joint Denoising & 2x Super-Resolution for Semiconductor Wafer Inspection
+# Wafer-Minds - Joint Denoising & 2x Super-Resolution for Semiconductor Wafer Inspection
 
-**i4C x KLA SemiCon AI Hackathon — Problem Statement 01: AI-Based Restoration of Degraded Images**
+i4C x KLA SemiCon AI Hackathon - Problem Statement 01: AI-Based Restoration of Degraded Images
 
-## Team
+Team
 
-| Name |  Contact |
+REYNA ( kreynareddy@gmail.com )
 
-| REYNA |   kreynareddy@gmail.com |
-| SACI | sacimense@gmail.com |
+SACI ( sacimense@gmail.com )
 
 College: PESU(RR)
 
----
+Problem
 
-## Problem
+Semiconductor inspection sensors generate images degraded by complex pipeline of speckle noise, additive Gaussian noise, and downsampling (in unknown order). This repo restores those degraded low-res scans to KLA’s high-res expectations, recovering fine wafer line patterns hidden by noise/downsampling.
 
-Semiconductor inspection sensors produce images degraded by a compound pipeline of **speckle noise**, **additive Gaussian noise**, and **downsampling**, applied in unknown order. This repository restores those degraded low-resolution scans back into clean, high-resolution images that KLA's downstream defect-detection systems can rely on — recovering fine wafer line patterns that noise and resolution loss would otherwise hide.
+Inputs: .npy 128×128 float32 (unclipped) [-0.08, 1.71] Values outside 0.0–1.0 are real sensor information, not “bad” data Target: .npy 256×256 float32 (clipped) [0.0, 1.0] Task: Joint denoising + 2x super-resolution (128×128 → 256×256)
 
-- **Input**: `.npy`, `128×128`, `float32`, unclipped range `[-0.08, 1.71]` (values outside `[0,1]` are genuine sensor signal, not corrupted data)
-- **Target**: `.npy`, `256×256`, `float32`, clean, bounded `[0.0, 1.0]`
-- **Task**: Joint denoising + 2x super-resolution (`128×128` → `256×256`)
+Approach
 
----
+We propose a Joint Denoise-SR ResUNet (~8.32M parameters) that denoises and performs 2x super-resolution (SR) simultaneously in a single forward pass instead of sequentially, thereby optimizing the joint task rather than cascading two separate tasks.
 
-## Approach
+Key innovations:
 
-We use a **Joint Denoise-SR ResUNet** (~8.32M parameters) that performs denoising and 2x upsampling in a single forward pass rather than as two separate stages, so restoration and resolution enhancement are optimized jointly instead of compounding each other's errors.
+Raw: Input images contain floats outside of 0.0–1.0, which must be preserved as they represent real information. We avoid clipping on input and only clamp to 0.0–1.0 on the model output to match target.
 
-**Why this design:**
+Multi-scale ResUNet: Encoder-decoder structure with 3 downsampling stages gives context for effective global noise modeling while preserving fine details through skip connections.
 
-- **Raw normalization**: Input values outside `[0,1]` encode real sensor information, so we never clip on input. The model consumes the raw float range and only enforces `[0,1]` via `torch.clamp` on the final output, matching the ground-truth distribution.
-- **Multi-scale ResUNet encoder-decoder**: 3-stage downsampling gives the network enough receptive field to reason about noise globally, while skip connections preserve fine spatial detail for the decoder.
-- **Residual Channel Attention Blocks (RCAB)**: adaptively reweight feature channels to suppress speckle/Gaussian noise while preserving fine wafer line edges.
-- **Sub-pixel convolution (PixelShuffle 2x)** for upsampling, avoiding the checkerboard artifacts common with transposed convolutions.
-- **Global bicubic shortcut**: the network predicts a residual on top of a bicubic-upsampled base rather than the full image from scratch, which speeds up convergence significantly.
+Residual Channel Attention Blocks: Adaptive channel-wise feature recalibration allows suppression of noisy frequencies while retaining fine wafer patterns.
 
-**Loss function:**
+Pixel Shuffle upsampling: Avoids transposed convolutions’ checkerboard artifacts. Global bicubic shortcut: Similar to UNet++, the model learns residual over bicubic upsampling for faster convergence.
 
-```
-L_total = 1.0 · L_Charbonnier + 0.2 · L_SSIM + 0.1 · L_Sobel-Edge
-```
+Loss: 1.0 × Charbonnier + 0.2 × SSIM + 0.1 × Sobel-edge
 
-- **Charbonnier loss** — a robust smooth-L1 variant, less sensitive to speckle outliers than plain MSE/L1.
-- **SSIM loss** — directly optimizes structural similarity, matching the hackathon's own evaluation metric.
-- **Sobel edge loss** — an L1 gradient loss in X/Y that keeps wafer line edges sharp instead of smoothed over.
+Charbonnier loss: Robust to speckle noise outliers vs MSE/L1.
 
----
+SSIM loss: Directly optimizes structural similarity, which drives the hackathon’s metrics.
 
-## Results
+Sobel-edge loss: Additional edge-aware smoothing in X/Y directions preserves fine wafer line edges from being overly smoothed.
 
-| Metric | Bicubic Baseline | Ours |
-|---|---|---|
-| PSNR | 22.4 db | 28.81 db |
-| SSIM | 0.53| 0.792 |
-| LPIPS | low| 0.2555 |
+Results
 
-_Add before/after sample comparisons (degraded input → restored output → ground truth) here — e.g. link or embed images from `weights/visualizations/`._
+Metric Bicubic Baseline Ours
 
----
+PSNR 22.4 db 28.81 db
 
-## Repository Structure
+SSIM 0.53 0.792
 
-```
+LPIPS low 0.2555
+
+_Add before/after comparisons (degraded input → our output → ground truth) here_ - e.g. insert images from weights/visualizations/
+
+Repo Structure
+
 .
+
 ├── README.md
+
 ├── requirements.txt
-├── model.py              # Joint Denoise-SR ResUNet definition
-├── dataset.py             # Paired dataset loader & augmentations
-├── losses.py               # Charbonnier + SSIM + Sobel-edge composite loss
-├── utils.py                 # PSNR / SSIM / LPIPS metrics + visualization helpers
-├── train.py                  # Training script (reproducible from scratch)
-├── eval.py                    # Standalone evaluation / inference script
+
+├── model.py # Joint Denoise-SR ResUNet definition
+
+├── dataset.py # Paired dataset loader & augmentations
+
+├── losses.py # Charbonnier + SSIM + Sobel-edge composite loss
+
+├── utils.py # PSNR / SSIM / LPIPS metrics + visualization helpers
+
+├── train.py # Training script (reproducible from scratch)
+
+├── eval.py # Standalone evaluation / inference script
+
 ├── weights/
-│   ├── model.pt                # Trained model checkpoint
-│   └── training_log.csv         # Per-epoch training metrics
+
+│ ├── model.pt # Checkpoint of trained model
+
+│ └── training_log.csv # Training metrics per epoch
+
 └── outputs/
-    └── restored_test/              # Model's restored output on the test set (.npy)
-```
 
-> **Note on large files**: if `weights/model.pt` exceeds GitHub's upload limits, it is hosted externally — see [Model Weights](#model-weights) below.
+└── restored_test/ # Model’s output for the test set (.npy)
 
----
+_Note: If weights/model.pt is too big for Github, it will need to be hosted elsewhere._
 
-## Setup
+Setup
 
-Requires **Python 3.10+** and a CUDA-capable GPU (CPU inference also works, just slower).
+Python 3.10+ with CUDA-capable GPU recommended (CPU-only also works, but much slower). Clone the repo, then install dependencies via pip:
 
-```bash
 git clone https://github.com/yourspixie/Wafer-Minds-KLA-PS01.git
+
 cd Wafer-Minds-KLA-PS01
+
 pip install -r requirements.txt
-```
 
----
+Usage (Inference / Evaluation)
 
-## Running Inference (Evaluation Script)
+eval.py loads the trained model checkpoint and applies it to every .npy file in input_dir, saving the restored results to output_dir . It runs out-of-the-box with no modifications other than the two required args below:
 
-`eval.py` loads the trained model, runs inference on every `.npy` file in an input directory, and writes restored `.npy` outputs to a specified output directory. It runs as-is with no manual edits — only the two required arguments below.
-
-```bash
 python eval.py --input_dir /path/to/test/npy/files --output_dir /path/to/save/restored/outputs
-```
 
-**Arguments:**
+Arguments:
 
-| Flag | Required | Description |
-|---|---|---|
-| `--input_dir` | Yes | Directory of degraded test `.npy` files (`128×128`, `float32`) |
-| `--output_dir` | Yes | Directory to write restored `.npy` files (`256×256`, `float32`, clamped to `[0,1]`) — created if it doesn't exist |
-| `--weights` | No | Path to a model checkpoint. Defaults to `weights/model.pt` |
+Flag Required Description
 
-Each output file is written with the same filename as its corresponding input file.
+--input_dir Yes Directory of degraded test .npy files (128×128 float32)
 
----
+--output_dir Yes Directory of restored .npy files (256×256 float32, [0.0, 1.0]) (created if not exists)
 
-## Training (Reproducing From Scratch)
+--weights No Path to a model checkpoint. Default: weights/model.pt
 
-```bash
+Each file in output_dir will have the same name as the corresponding input file.
+
+Training (Reproducing From Scratch)
+
 python train.py --data_dir /path/to/train --epochs 15 --batch_size 16 --lr 2e-4
-```
 
-Training expects paired degraded/ground-truth `.npy` files under `--data_dir` (see `dataset.py` for the expected folder layout). Per-epoch loss, PSNR, and SSIM are logged to `weights/training_log.csv`, and visual grids (Input | Prediction | Ground Truth | Error Map) are saved to `weights/visualizations/` for inspection.
+training expects the paired degraded/target .npy files under --data_dir (see dataset.py for details). The loss, epoch PSNR, and SSIM will be logged to weights/training_log.csv and visualized in weights/visualizations as the training proceeds.
 
----
+Model Weights
 
-## Model Weights
+File: weights/model.pt
 
-- File: `weights/model.pt`
-- Format: PyTorch `state_dict` (`.pt`), loadable directly by `eval.py`
-- Size: 33.1MB
----
+Format: PyTorch state_dict (.pt)
 
-## Technology & Feasibility
+Size: 33.1 MB
 
-- **Framework**: PyTorch
-- **Hardware used for training**: _GPU type, cloud platform_
-- **Training time**: _TBD_
-- **Model size**: ~8.32M parameters
-- **Inference time**: ~2–5 ms/image on H100/A100-class GPUs
+Technology / Feasibility
 
----
+Framework PyTorch
 
-## Requirements
+Training Hardware: _GPU type, cloud provider_
 
-Full pinned dependency list (from `pip freeze` in the training environment) is in [`requirements.txt`](./requirements.txt).
+Training Time: _Time taken_
 
----
+Model size: ~8.32M parameters
 
+Inference speed: ~2ms–5ms/image on H100/A100 GPUs
 
+Requirements
+
+The full dependency listing (from pip freeze) for the environment in which the model was trained is in requirements.txt
