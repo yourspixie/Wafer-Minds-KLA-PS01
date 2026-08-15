@@ -51,9 +51,9 @@ L_total = 1.0 · L_Charbonnier + 0.2 · L_SSIM + 0.1 · L_Sobel-Edge
 
 | Metric | Bicubic Baseline | Ours |
 |---|---|---|
-| PSNR | _TBD_ | _TBD_ |
-| SSIM | _TBD_ | _TBD_ |
-| LPIPS | _TBD_ | _TBD_ |
+| PSNR | 22.4 db | 28.81 db |
+| SSIM | 0.53| 0.792 |
+| LPIPS | low| 0.2555 |
 
 _Add before/after sample comparisons (degraded input → restored output → ground truth) here — e.g. link or embed images from `weights/visualizations/`._
 
